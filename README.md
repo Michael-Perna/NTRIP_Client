@@ -8,8 +8,8 @@ NTRIP client for Swisspos,
 
 - **swipos_Michael_backup.py**: This script is a junk script. 
 
-# To impletent
-- *multithreafind*: https://www.geeksforgeeks.org/multithreading-python-set-1/
+# Next step
+- **multithreafind**: https://www.geeksforgeeks.org/multithreading-python-set-1/
 
 # References
 This code is heavly inspirated from the following code: 
