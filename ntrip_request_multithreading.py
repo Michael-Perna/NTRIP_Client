@@ -89,8 +89,15 @@ class NtripSocket(threading.Thread):
                 self.is_connected = False
             
             # send a new GGA message from time to time
+            
+            ###### REPLACE THIS BY A MESSAGE FROM THE QUEUE
             if round(self.counter/50.0) == self.counter / 50.0:
                 self.s.send(ggaString.encode('utf-8'))
+                
+            ###### FOR INSTANCE
+            # if not gga_queue.empty():
+            #     my_str = gga_queue.get()
+            #     self.s.send(my_str.encode('utf-8'))
             
 class UbxSerial(threading.Thread):
     def __init__(self):
