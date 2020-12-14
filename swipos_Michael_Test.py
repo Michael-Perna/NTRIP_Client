@@ -31,7 +31,6 @@ USERAGENT = 'RTKraspberry'
 BAUDRATE = 115200
 ggaString = '$GPGGA,082904.398,4655.677,N,00727.100,E,1,12,1.0,0.0,M,0.0,M,,*6C\r\n'
 
-
     
 # CREATE SOCKET
 try:
