@@ -8,6 +8,12 @@ NTRIP client for Swisspos,
 
 - **swipos_Michael_backup.py**: This script is a junk script. 
 
+# News:
+- **swipos.py**: 
+- debug multithreating ntripcaster. Resolved bug with UbxSerail when using with a serial port
+- Separete read_nmea and send_rtcm proccesses into two separeted thread
+- Added a new thread that log all the NMEA messages into a tesxt file. The process restart each 12 minutes
+
 # Next step
 - **multithreafind**: https://www.geeksforgeeks.org/multithreading-python-set-1/
 
