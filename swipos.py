@@ -45,34 +45,24 @@ class NtripSocket(threading.Thread):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.counter = 0
         
-        
-    def run(self):
-        # Starting infinite loop when the first NMEA message arrive
-        while gga_queue.empty():
-            time.sleep(0.05)
-        # print(gga_queue.get())
-        
-        while True:
-            self.counter = self.counter + 1
+    def reset(self):
+        print("NTRIP socket re-initialized")
+        # # Close previous socket
+        # self.s.close()
+        # Open new socket
+        self.s.shutdown(2)
+        self.s.close()
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-            print(self.counter)
-            # if self.counter > 300:
-                # break
-            ## if we are not connected, connect
-            if not self.is_connected:
-                # socket might be open already
-                try:
-                    remote_ip = socket.gethostbyname(HOST)
-                except socket.gaierror:
-                    print('Hostname could not be resolved. Exiting')
-                    time.sleep(0.05)
-                    continue
-
-                error_indicator = self.s.connect_ex((remote_ip , PORT))
-               
-                if not error_indicator == 0:
-                    continue
-                
+        
+    def connect(self):
+         # socket might be open already
+        try:
+            remote_ip = socket.gethostbyname(HOST)
+            error_indicator = self.s.connect_ex((remote_ip , PORT))
+            # print(error_indicator)
+            
+            if error_indicator == 0:
                 # Prepare the authentification string for the NTRIP caster
                 userpswd = USER + ':' + PASSWORD
                 # Encode the user name and password 4 security
@@ -86,47 +76,73 @@ class NtripSocket(threading.Thread):
                     'Accept: */*\r\n\r\n' +\
                     '{}\r\n'.format(gga_queue.get())
                 
+                # print(server_request)
+                
+                print('\r\nConnection to server')
                 self.s.sendall(server_request.encode('utf-8'))   # Send the request
-                casterResponse = self.s.recv(1024)                 # Listen the answer
+                casterResponse = self.s.recv(1024)               # Listen the answer
+                
+                # print(casterResponse)
                 
                 if ("ICY 200 OK").encode('utf-8') in casterResponse:
                     print('Connected')
                     self.is_connected = True
                 
-                # reset counter 
-                self.counter = 0
+                if ("401 Unauthorized").encode('utf-8') in casterResponse:
+                    print('401 Unauthorized')
+                    self.is_connected = False
+                    self.reset()
+                    # time.sleep(0.5)
+            else:
+                self.reset()
+                print(error_indicator)
+                time.sleep(0.5)
+                
+                            
+        except socket.gaierror:
+            print('Hostname could not be resolved. Exiting')
+            time.sleep(0.5)
+
+    def run(self):
+        # Starting infinite loop when the first NMEA message arrive
+        while gga_queue.empty():
+            time.sleep(0.05)
+        # print(gga_queue.get())
+        
+        while True:
+            self.counter = self.counter + 1
+            
+            ## if we are not connected, connect
+            if not self.is_connected:
+               self.connect()
+               # reset counter 
+               self.counter = 0
 
             if self.is_connected:
                 ## Listen to NTRIP caster (Swipos)
                 try:
                     rtcm_line = self.s.recv(1000000)
-                    print(rtcm_line)
-                    self.is_listening = True
+                    # print(rtcm_line)
+                    print(f'RTCM message received.      Counter : {self.counter}')
+                    
+                    # In case of disconnection, set flag accordingly
+                    if len(rtcm_line) < 3:
+                       self.is_connected = False
                 except:
-                    print('No message from NTRIP caster')
+                    print('\r\nNo message from NTRIP caster')
+                    self.is_connected = False
                     pass
                 
                 # Add RTCM to the queue
-                if self.is_listening:
-                    try: 
-                        # add the rtcm_line to the queue
-                        rtcm_queue.put(rtcm_line)
-                    except:
-                        print('')
-                        # In case of disconnection, set flag accordingly
-                        if len(rtcm_line) < 3:
-                            self.is_connected = False
-                    
-                    self.is_listening = False
+                try: 
+                    # add the rtcm_line to the queue
+                    rtcm_queue.put(rtcm_line)
+                except:
+                    # In case of disconnection, set flag accordingly
+                    self.is_connected = False
                     
                     
                 # send a new GGA message from time to time
-                
-                ###### REPLACE THIS BY A MESSAGE FROM THE QUEUE
-                # if round(self.counter/50.0) == self.counter / 50.0:
-                #     self.s.send(ggaString.encode('utf-8'))
-                    
-                ###### FOR INSTANCE
                 if not gga_queue.empty() and self.is_connected:
                     my_str = gga_queue.get()
                     try:
@@ -134,6 +150,11 @@ class NtripSocket(threading.Thread):
                     except:
                         # when the connection is not wroking this raise an exception with send
                         self.is_connected = False
+                
+                # Re-connect after disconnection
+                if not self.is_connected:
+                    print('disconnection')
+                    # self.reset()
                     
 class NmeaSerial(threading.Thread):
     def __init__(self):
