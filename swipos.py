@@ -14,6 +14,7 @@ import queue
 import threading
 import time
 import datetime
+import os
 
 SERIALPORT = '/dev/ttyAMA1'
 
@@ -24,7 +25,7 @@ USER = 'swisstopoMobility2'
 PASSWORD = 'wabern3084'
 USERAGENT = 'RTKraspberry'
 LOG_FOLDER = '/home/pi/swipos_nmea/'
-LOG_REAPEAT = 720 # Interval of time in second to save into new log file
+LOG_REAPEAT = 1200 # Interval of time in second to save into new log file
 
 BAUDRATE = 115200
 # ggaString = '$GPGGA,082904.398,4655.677,N,00727.100,E,1,12,1.0,0.0,M,0.0,M,,*6C\r\n'
@@ -95,47 +96,55 @@ class NtripSocket(threading.Thread):
                 # reset counter 
                 self.counter = 0
 
-            ## Listen to NTRIP caster (Swipos)
-            try:
-                rtcm_line = self.s.recv(1000000)
-                print(rtcm_line)
-                self.is_listening = True
-            except:
-                print('No message from NTRIP caster')
-                pass
-            
-            # Add RTCM to the queue
-            if self.is_listening:
-                try: 
-                    # add the rtcm_line to the queue
-                    rtcm_queue.put(rtcm_line)
+            if self.is_connected:
+                ## Listen to NTRIP caster (Swipos)
+                try:
+                    rtcm_line = self.s.recv(1000000)
+                    print(rtcm_line)
+                    self.is_listening = True
                 except:
-                    print('')
-                    # In case of disconnection, set flag accordingly
-                    if len(rtcm_line) < 3:
+                    print('No message from NTRIP caster')
+                    pass
+                
+                # Add RTCM to the queue
+                if self.is_listening:
+                    try: 
+                        # add the rtcm_line to the queue
+                        rtcm_queue.put(rtcm_line)
+                    except:
+                        print('')
+                        # In case of disconnection, set flag accordingly
+                        if len(rtcm_line) < 3:
+                            self.is_connected = False
+                    
+                    self.is_listening = False
+                    
+                    
+                # send a new GGA message from time to time
+                
+                ###### REPLACE THIS BY A MESSAGE FROM THE QUEUE
+                # if round(self.counter/50.0) == self.counter / 50.0:
+                #     self.s.send(ggaString.encode('utf-8'))
+                    
+                ###### FOR INSTANCE
+                if not gga_queue.empty() and self.is_connected:
+                    my_str = gga_queue.get()
+                    try:
+                        self.s.send(my_str.encode('utf-8'))
+                    except:
+                        # when the connection is not wroking this raise an exception with send
                         self.is_connected = False
-                
-                self.is_listening = False
-                
-                
-            # send a new GGA message from time to time
-            
-            ###### REPLACE THIS BY A MESSAGE FROM THE QUEUE
-            # if round(self.counter/50.0) == self.counter / 50.0:
-            #     self.s.send(ggaString.encode('utf-8'))
-                
-            ###### FOR INSTANCE
-            if not gga_queue.empty():
-                my_str = gga_queue.get()
-                self.s.send(my_str.encode('utf-8'))
-            
-class UbxSerial(threading.Thread):
+                    
+class NmeaSerial(threading.Thread):
     def __init__(self):
-        print("UBX Serial initialized")
+        print("Nmea Serial initialized")
         threading.Thread.__init__(self)
         self.serialPort = serial.Serial(SERIALPORT, baudrate = BAUDRATE, timeout = 0.5)
         # self.time_thread = None
         self.is_open = False
+        self.filename = 'This is not a file name'
+        self.log_file = None
+        self.count = 0
         
     def checksum(self, nmea):
         try:    
@@ -168,55 +177,56 @@ class UbxSerial(threading.Thread):
         
     
     def cron_log(self):
-        # Each 12 min create new log file
-        # threading.Timer(720, self.save_log).start()
-        self.save_log()
+        
+        # Create file once
+        self.create_file()
+        
         while True:
             time.sleep(LOG_REAPEAT)
-            self.save_log()
+            try:
+                # Create new file each X second
+                self.create_file()
+            except:
+                pass
+            
+            
+    def create_file(self):
+        try:
+            # Get current time as string
+            #date and time format: dd/mm/YYYY-H:M:S
+            time_format="%Y-%m-%d_%H-%M-%S"
+            current_time = datetime.datetime.now().strftime(time_format)
+
+            # Give name to log file
+            # IN FUTURE AS FUNCTION INPUT
+            extension = '.txt'
+            self.filename = LOG_FOLDER + current_time + extension
+       
+            # Open/Create new file 
+            self.log_file = open(self.filename, 'w')
+            print(f'Log file created: {self.filename}')
+            
+            self.is_open = True
+        except:
+            print(f'Could not create log file: {self.filename}')
+            pass
+                
     def save_log(self):
-        print('save log started')
-        
-        # First time is ingored then it will close the file before to open a new one
-        print(f'file is open: {self.is_open}')
-        if self.is_open:
-            #Close the opened files
-            log_file.close()
-            self.is_open = False
-        
+
         # Start infinite Loop 
         while True:
-
-            if not self.is_open:
-                print(f'ser_queue : {ser_queue.get()}')
-                try:
-                    # Get current time as string
-                    #date and time format: dd/mm/YYYY-H:M:S
-                    time_format="%d-%m-%Y_%H%M%S"
-                    current_time = datetime.datetime.now().strftime(time_format)
-
-                    # Give name to log file
-                    # IN FUTURE AS FUNCTION INPUT
-                    extension = '.txt'
-                    file_name = LOG_FOLDER + current_time + extension
-               
-                    # Open/Create new file 
-                    log_file = open(file_name, 'w')
-                    print(f'Log file created: {file_name}')
-                    
-                    self.is_open = True
-                except:
-                    print(f'Could not create log file: {file_name}')
-                    pass
-
+            # this is in case of ncftput delete the actual file
+            if not os.path.isfile(self.filename):
+                self.create_file()
+                
             if not ser_queue.empty():
-                # Write in the log file
+                
                 try:
                     # Get messages from queue
                     log_line = ser_queue.get()
                     
                     # Wirte in the file 
-                    log_file.write(log_line)
+                    self.log_file.write(log_line)
 
                 except:
                     print('Could not write into the log file: ')
@@ -227,6 +237,9 @@ class UbxSerial(threading.Thread):
     def read_nmea(self):
         # Start infinity loop
         print('Read_nmea function start')
+        
+        #Add test if port is open otherwise try to open 
+
         while True:
             try:
                 # Read one line from the port
@@ -242,7 +255,13 @@ class UbxSerial(threading.Thread):
                     # print(ser.decode('utf-8'))
             except:
                 print('Failed to read from dev/tty')
+                self.count = self.count + 1
                 pass
+            if self.count > 50 :
+                # Attempt new reconnaction
+                self.serialPort.close()
+                
+                self.serialPort = serial.Serial(SERIALPORT, baudrate = BAUDRATE, timeout = 0.5)
             
     def send_rtcm(self):
         print('read rtcm start')
@@ -264,15 +283,21 @@ class UbxSerial(threading.Thread):
         threading.Thread(target = self.send_rtcm).start()
         print("Thread initialized")
         
-    def threading_log(self):
+    def threading_cron(self):
         threading.Thread(target = self.cron_log).start()
         # self.time_thread = threading.Timer(720, self.save_log, args=self).start()
         print('New log threading')
 
+    def threading_save(self):
+        threading.Thread(target = self.save_log).start()
+        # self.time_thread = threading.Timer(720, self.save_log, args=self).start()
+        print('New log threading')
+        
 my_ntrip_socket = NtripSocket()
 my_ntrip_socket.start()
 
-my_ubx_serial = UbxSerial()
-my_ubx_serial.threading_nmea()
-my_ubx_serial.threading_rtcm()
-my_ubx_serial.threading_log()
+my_nmea_serial = NmeaSerial()
+my_nmea_serial.threading_nmea()
+my_nmea_serial.threading_rtcm()
+#my_nmea_serial.threading_cron()
+#my_nmea_serial.threading_save()
