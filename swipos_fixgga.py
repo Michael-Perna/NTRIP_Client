@@ -15,6 +15,8 @@ import threading
 import time
 import datetime
 import os
+import urllib.request
+
 
 SERIALPORT = '/dev/ttyAMA1'
 
@@ -53,6 +55,13 @@ class NtripSocket(threading.Thread):
         self.s.shutdown(2)
         self.s.close()
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def checkconnection(host='http://google.com'):
+        try:
+            urllib.request.urlopen(host) #Python 3.x
+            return True
+        except:
+            return False
 
         
     def connect(self):
@@ -101,10 +110,24 @@ class NtripSocket(threading.Thread):
                             
         except socket.gaierror:
             print('Hostname could not be resolved. Exiting')
+            self.is_connected = False
             time.sleep(0.5)
 
-                    
+    # Thread wrap function, solution taken from StackOveriuew 
+    # This after the encounter of a an exception "restard" the thread function
     def run(self):
+ 
+        while True:
+            try:
+                self.threadfunction()
+            except BaseException as e:
+                 print('{!r}; restarting thread'.format(e))
+            else:
+                print('exited normally, bad thread; restarting')
+
+
+    def threadfunction(self):
+
         # Starting infinite loop when the first NMEA message arrive
         while gga_queue.empty():
             time.sleep(0.05)
@@ -132,7 +155,7 @@ class NtripSocket(threading.Thread):
                 except:
                     print('\r\nNo message from NTRIP caster')
                     self.is_connected = False
-                    pass
+                    
                 
                 # Add RTCM to the queue
                 try: 
@@ -149,13 +172,14 @@ class NtripSocket(threading.Thread):
                     try:
                         self.s.send(my_str.encode('utf-8'))
                     except:
-                        # when the connection is not wroking this raise an exception with send
+                        # when the connection is not working this raise an exception with send
+                        print('Could not send GGA message')
                         self.is_connected = False
-                
+                    
                 # Re-connect after disconnection
                 if not self.is_connected:
                     print('disconnection')
-                    # self.reset()
+                    self.reset()
                     
 class NmeaSerial(threading.Thread):
     def __init__(self):
@@ -297,6 +321,7 @@ class NmeaSerial(threading.Thread):
                     print('Failed to write from /dev/tty')
                     pass
 
+
     def threading_nmea(self):
         threading.Thread(target = self.read_nmea).start()
         print("Thread initialized")
@@ -314,6 +339,7 @@ class NmeaSerial(threading.Thread):
         threading.Thread(target = self.save_log).start()
         # self.time_thread = threading.Timer(720, self.save_log, args=self).start()
         print('New log threading')
+    
 
 class DebugSwipos(threading.Thread):
     def __init__(self):
@@ -330,6 +356,24 @@ class DebugSwipos(threading.Thread):
                 rtcm_msg = rtcm_queue.get()
                 # print(rtcm_msg)
     
+    def watchdog(self):
+        # host='http://google.com'
+
+        # while True:
+            
+        #     try:
+        #         urllib.request.urlopen(host) #Python 3.x
+
+        #     except:
+        #         print('no internet!')
+                
+        #     time.sleep(0.5)
+        while True:
+            print('\r\nIs thread alive :', my_ntrip_socket.isAlive(), '\r\n')
+            time.sleep(5)
+            if not my_ntrip_socket.isAlive():
+                continue
+    
     def threading_nmea(self):
         threading.Thread(target = self.addgga).start()
         print("Thread initialized")
@@ -337,10 +381,14 @@ class DebugSwipos(threading.Thread):
     def threading_rtcm(self):
         threading.Thread(target = self.readrtcm).start()
         print("Thread initialized")
-        
+   
+    def threading_watchdog(self):
+        threading.Thread(target = self.watchdog).start()
+        # self.time_thread = threading.Timer(720, self.save_log, args=self).start()
+        print('New log threading')
+
 my_ntrip_socket = NtripSocket()
 my_ntrip_socket.start()
-
 # my_nmea_serial = NmeaSerial()
 # my_nmea_serial.threading_nmea()
 # my_nmea_serial.threading_rtcm()
@@ -349,3 +397,4 @@ my_ntrip_socket.start()
 my_nmea_debug = DebugSwipos()
 my_nmea_debug.threading_nmea()
 my_nmea_debug.threading_rtcm()
+my_nmea_debug.threading_watchdog()
