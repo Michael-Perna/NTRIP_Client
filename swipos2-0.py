@@ -20,15 +20,13 @@ SERIALPORT = '/dev/ttyAMA1'
 HOST = 'www.swipos.ch'  # NTRIP Caster
 PORT = 2101             # Port used by the NTRIP caster
 MOUNTPOINT = 'MSM_GISGEO_LV95LHN95'
-USER = 'swisstopoMobility2'
-PASSWORD = 'wabern3084'
+USER = 'swisstopo***'
+PASSWORD = '********'
 USERAGENT = 'RTKraspberry'
 LOG_FOLDER = '/home/pi/swipos_nmea/'
 LOG_REAPEAT = 1200 # Interval of time in second to save into new log file
 
 BAUDRATE = 115200
-# ggaString = '$GPGGA,082904.398,4655.677,N,00727.100,E,1,12,1.0,0.0,M,0.0,M,,*6C\r\n'
-
 # Global variables (queues for the messages)
 rtcm_queue = queue.Queue()
 gga_queue = queue.Queue()
