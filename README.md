@@ -2,11 +2,11 @@
 NTRIP client for Swisspos,
 
 
-- **swipos_Michael.py**:        This Script does the connection between a serial port and a ntrip caster. It find the GGA message from the NMEA output of a GNSS receiver and send it to  the ntrip caster. Once it receive the RTCM message it send it back to the GNSS receiver. 
+- **swipos.py**:        This Script does the connection between a serial port and a ntrip caster. It find the GGA message from the NMEA output of a GNSS receiver and send it to  the ntrip caster. Once it receive the RTCM message it send it back to the GNSS receiver. This is à fully working version of NTRIPCaster which however suffer of a known bug: after a brak in the internet conncetion or between the NTRIP Caster and the NTRIP server the NTRIP Client does not reinitilize correctly. 
 
-- **swipos_Michael_Test.py**:   This Script send a fixe NMEA string to the ntrip caster Swipos. It work indipendently of a GNSS receiver. Therefore it can be used to test the connection. 
+- **swipos2-0.py**:   This script solve the knowned bug of swipos.py and sucessufully reinitilize the NTRIP-Caster after a internet deconnection. However un minor bug has appear : the distance between the base station and the receiver position tend to grow with time ater it expereince interent deconnection. This issues has not enough be study but it doesn't had degrade the solution to be visible on our results. To fix this problem I suggest to flush the threading list of gga nmea message after each decconnation.
 
-- **swipos_Michael_backup.py**: This script is a junk script. 
+- **swipos_fixgga.py**:   This Script send a fixe NMEA string to the ntrip caster Swipos. It work indipendently of a GNSS receiver. Therefore it can be used to test the connection messages.
 
 # News:
 - **swipos.py**: 
@@ -15,6 +15,7 @@ NTRIP client for Swisspos,
 - Added a new thread that log all the NMEA messages into a tesxt file. The process restart each 12 minutes
 
 # Next step
+- Lunch the script as a command with the global variables as parameters
 - **multithreafind**: https://www.geeksforgeeks.org/multithreading-python-set-1/
 
 # References
