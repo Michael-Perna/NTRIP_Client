@@ -1,5 +1,14 @@
 # NTRIP_Client
+
+# Description 
 NTRIP client for Swisspos,
+
+# Table-of-Content
+# Installation
+# Usage
+# Contributing
+# Credits
+# License
 
 
 - **swipos.py**:        This Script does the connection between a serial port and a ntrip caster. It find the GGA message from the NMEA output of a GNSS receiver and send it to  the ntrip caster. Once it receive the RTCM message it send it back to the GNSS receiver. This is à fully working version of NTRIPCaster which however suffer of a known bug: after a brak in the internet conncetion or between the NTRIP Caster and the NTRIP server the NTRIP Client does not reinitilize correctly. 
