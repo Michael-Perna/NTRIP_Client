@@ -3,7 +3,7 @@
 """
 Created on Sat Dec 12 14:20:40 2020.
 
-@author: Daniel
+@author: Michael Perna
 """
 import socket
 import sys
@@ -25,8 +25,9 @@ PASSWORD = '********'
 USERAGENT = 'RTKraspberry'
 LOG_FOLDER = '/home/pi/swipos_nmea/'
 LOG_REAPEAT = 1200  # Interval of time in second to save into new log file
-
+debugMode = True
 BAUDRATE = 115200
+
 # Global variables (queues for the messages)
 rtcm_queue = queue.Queue()
 gga_queue = queue.Queue()
@@ -335,7 +336,7 @@ class NmeaSerial(threading.Thread):
         # TODO: reduce branches
         try:
             print('read rtcm start')
-             # Start infinite Loop
+            # Start infinite Loop
             while True:
                 if not rtcm_queue.empty():
                     try:
@@ -382,11 +383,58 @@ class Watchdog(threading.Thread):
                 pass
 
 
+class DebugMode(threading.Thread):
+    """Send fix NMEA GGA message instead to read the serial port.
+
+    use:
+            When the debug mode is activated the class DebugMode() class
+            replace the NmeaSerial() class
+
+    Description:
+            No GNSS receiver is required but instead a fix NMEA GGA string
+            is used to test the NtripSocket() functionning
+    """
+
+    def __init__(self):
+        """Initialize Debug() class parameter."""
+        self.ggaString = '$GPGGA,082904.398,4655.677,N,00727.100' \
+                         ',E,1,12,1.0,0.0,M,0.0,M,,*6C\r\n'
+
+    def fix_gga(self):
+        """Add each 5 seconds a fix NMEA-GGA string to the gga_queue."""
+        while True:
+            gga_queue.put(self.ggaString)
+            time.sleep(5)
+
+    def readrtcm(self):
+        """Receipt the RTCM string messages."""
+        while True:
+            if not rtcm_queue.empty():
+                rtcm_msg = rtcm_queue.get()
+                print(rtcm_msg)
+
+    def threading_nmea(self):
+        """Initialize and run read_nmea() thread."""
+        threading.Thread(target=self.fix_gga).start()
+        print("NMEA thread initialized")
+
+    def threading_rtcm(self):
+        """Initialize and run send_rtcm() thread."""
+        threading.Thread(target=self.readrtcm).start()
+        print("RTCM thread initialized")
+
+
 my_ntrip_socket = NtripSocket()
 my_ntrip_socket.start()
 
 my_watchdog = Watchdog()
 my_watchdog.start()
-my_nmea_serial = NmeaSerial()
-my_nmea_serial.threading_nmea()
-my_nmea_serial.threading_rtcm()
+
+if not debugMode:
+    my_nmea_serial = NmeaSerial()
+    my_nmea_serial.threading_nmea()
+    my_nmea_serial.threading_rtcm()
+elif debugMode:
+    my_nmea_debug = DebugMode()
+    my_nmea_debug.threading_nmea()
+    my_nmea_debug.threading_rtcm()
